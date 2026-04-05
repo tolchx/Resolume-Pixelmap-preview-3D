@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resolume Pixelmap preview 3D</title>
+    <script src="js/tailwind-config.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="min-h-screen p-2 md:p-4 font-sans bg-vj-bg text-gray-100">
+    <div class="max-w-none w-full mx-auto space-y-6">
+        <header class="text-center space-y-3">
+            <div class="flex items-center justify-between gap-4">
+                <div class="w-10"></div>
+                <h1 class="text-3xl md:text-4xl font-bold text-vj-neonBlue flex-1">Resolume Pixelmap preview 3D</h1>
+                <button id="drawer-toggle-btn" class="w-10 h-10 inline-flex items-center justify-center rounded-lg border border-vj-border bg-vj-panel2 hover:bg-vj-panel transition-colors text-white" title="Panel (P)">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <div id="results-area" class="w-full">
+            <div class="bg-vj-panel rounded-xl p-4 shadow-lg border border-vj-border">
+                <div class="flex items-center justify-between gap-3 mb-4">
+                    <h2 class="text-xl font-semibold text-white">Vista 3D</h2>
+                    <span id="slice-count" class="text-sm bg-vj-cyan/15 text-vj-cyan px-3 py-1 rounded-full font-mono"></span>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex flex-wrap items-center gap-4">
+                        <label class="flex items-center gap-2 text-sm text-gray-300">
+                            <input id="toggle-grid" type="checkbox" class="accent-vj-cyan" checked>
+                            <span>Grid</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-300">
+                            <input id="toggle-snap" type="checkbox" class="accent-vj-magenta">
+                            <span>Snap</span>
+                        </label>
+                        <div class="flex items-center overflow-hidden rounded-lg border border-vj-border bg-vj-panel2/60">
+                            <button id="rect-output-btn" class="px-3 py-1.5 text-sm text-white bg-vj-panel hover:bg-vj-panel transition-colors">
+                                Output
+                            </button>
+                            <button id="rect-input-btn" class="px-3 py-1.5 text-sm text-white hover:bg-vj-panel transition-colors border-l border-vj-border">
+                                Input
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="flex items-center overflow-hidden rounded-lg border border-vj-border bg-vj-panel2/60">
+                            <button id="view-3d-btn" class="px-3 py-1.5 text-sm text-white bg-vj-panel hover:bg-vj-panel transition-colors">
+                                3D
+                            </button>
+                            <button id="view-xml-btn" class="px-3 py-1.5 text-sm text-white hover:bg-vj-panel transition-colors border-l border-vj-border">
+                                XML
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="three-container" class="mt-4 w-full rounded border border-vj-border overflow-hidden relative">
+                    <canvas id="three-canvas" class="w-full h-[70vh] min-h-[520px] block"></canvas>
+                    <div class="absolute top-3 right-3 flex items-center gap-2">
+                        <div class="flex items-center overflow-hidden rounded-lg border border-vj-border bg-vj-panel/70 backdrop-blur">
+                            <button id="mode-move-btn" class="px-2.5 py-2 text-white bg-vj-panel hover:bg-vj-panel transition-colors" title="Mover">
+                                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M2 12h20"/><path d="m7 5 5-3 5 3"/><path d="m7 19 5 3 5-3"/><path d="m5 7-3 5 3 5"/><path d="m19 7 3 5-3 5"/></svg>
+                            </button>
+                            <button id="mode-rotate-btn" class="px-2.5 py-2 text-white hover:bg-vj-panel transition-colors border-l border-vj-border" title="Rotar">
+                                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3.3-6.9"/><path d="M21 3v6h-6"/></svg>
+                            </button>
+                        </div>
+                        <button id="nav-btn" class="px-2.5 py-2 rounded-lg border border-vj-border bg-vj-panel/70 backdrop-blur text-white hover:bg-vj-panel transition-colors" title="Navegación (WASD + mouse)">
+                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M12 7a5 5 0 1 0 0 10a5 5 0 0 0 0-10"/></svg>
+                        </button>
+                        <button id="fit-btn" class="px-2.5 py-2 rounded-lg border border-vj-border bg-vj-panel/70 backdrop-blur text-white hover:bg-vj-panel transition-colors" title="Centrar cámara">
+                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h3"/><path d="M20 7V4h-3"/><path d="M4 17v3h3"/><path d="M20 17v3h-3"/><path d="M9 12h6"/><path d="M12 9v6"/></svg>
+                        </button>
+                        <button id="undo-btn" class="px-2.5 py-2 rounded-lg border border-vj-border bg-vj-panel/70 backdrop-blur text-white hover:bg-vj-panel transition-colors disabled:opacity-40 disabled:pointer-events-none" title="Deshacer (Ctrl+Z)" disabled>
+                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9H3"/></svg>
+                        </button>
+                        <button id="redo-btn" class="px-2.5 py-2 rounded-lg border border-vj-border bg-vj-panel/70 backdrop-blur text-white hover:bg-vj-panel transition-colors disabled:opacity-40 disabled:pointer-events-none" title="Rehacer (Ctrl+Y)" disabled>
+                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9h9"/></svg>
+                        </button>
+                        <button id="reset-rot-btn" class="px-2.5 py-2 rounded-lg border border-vj-border bg-vj-panel/70 backdrop-blur text-white hover:bg-vj-panel transition-colors" title="Reiniciar rotación (vista)">
+                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="xml-view" class="hidden mt-4 w-full rounded border border-vj-border overflow-hidden">
+                    <pre class="m-0 p-4 overflow-auto text-xs leading-5 bg-vj-panel2/60"><code id="xml-code" class="block font-mono text-gray-100"></code></pre>
+                </div>
+                <ul class="mt-3 text-xs text-gray-400 list-disc list-inside space-y-1">
+                    <li>Orbit: clic y arrastre para rotar la vista, rueda para zoom, clic para seleccionar pantalla.</li>
+                    <li>Posiciona pantallas con el gizmo; exporta en cm (Unreal Units).</li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="drawer-backdrop" class="hidden fixed inset-0 pointer-events-none"></div>
+        <aside id="side-drawer" class="fixed top-0 right-0 h-full w-[520px] max-w-[95vw] bg-vj-panel border-l border-vj-border shadow-2xl translate-x-full transition-transform z-50">
+            <div class="p-4 border-b border-vj-border flex items-center justify-between gap-3">
+                <div class="text-white font-semibold">Panel</div>
+                <button id="drawer-close-btn" class="px-2 py-1 rounded border border-vj-border bg-vj-panel2 hover:bg-vj-panel transition-colors text-white">
+                    Cerrar
+                </button>
+            </div>
+            <div class="p-4 space-y-4 overflow-y-auto h-[calc(100%-56px)]">
+                <div id="drop-zone" class="bg-vj-panel2/40 rounded-xl p-4 shadow-lg border border-vj-border hover:border-vj-cyan transition-colors cursor-pointer">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-10 h-10 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <div class="min-w-0">
+                            <div class="text-sm font-medium text-gray-100">Importar XML / JSON</div>
+                            <div class="text-xs text-gray-400 truncate">Arrastra o haz clic para seleccionar</div>
+                        </div>
+                    </div>
+                    <input type="file" id="file-input" accept=".xml,.json,application/xml,application/json,text/xml,text/json" class="hidden" />
+                    <div class="mt-4 space-y-2">
+                        <div class="flex items-center justify-between text-xs text-gray-400">
+                            <span id="status-text">Listo</span>
+                            <span id="status-meta" class="font-mono"></span>
+                        </div>
+                        <div class="w-full h-2 bg-vj-panel2 rounded-full overflow-hidden border border-vj-border">
+                            <div id="progress-bar" class="h-full w-0 bg-gradient-to-r from-vj-cyan to-vj-magenta transition-[width]"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="inspector-panel" class="bg-vj-panel2/20 rounded-xl p-4 shadow-lg border border-vj-border">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="text-base font-semibold text-white">Inspector</div>
+                        <div id="sel-count" class="text-xs font-mono text-gray-400"></div>
+                    </div>
+                    <div id="inspector-none" class="mt-3 text-sm text-gray-400">Selecciona una pantalla (Ctrl+Click para múltiple).</div>
+                    <div id="inspector-single" class="hidden mt-3 space-y-3">
+                        <div class="text-sm text-gray-200 font-medium truncate" id="inspector-name"></div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <div class="text-xs text-gray-400 mb-1">Pos X</div>
+                                <div class="flex items-center gap-1">
+                                    <button data-step="-10" data-field="posx" class="px-2 py-1 rounded border border-vj-border bg-vj-panel hover:bg-vj-panel2 transition-colors text-xs text-white">-</button>
+                                    <input id="posx" type="number" min="-50000" max="50000" step="0.1" class="w-full px-2 py-1 rounded border border-vj-border bg-vj-panel font-mono text-sm text-gray-100">
+                                    <button data-step="10" data-field="posx" class="px-2 py-1 rounded border border-vj-border bg-vj-panel hover:bg-vj-panel2 transition-colors text-xs text-white">+</button>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-gray-400 mb-1">Pos Y</div>
+                                <div class="flex items-center gap-1">
+                                    <button data-step="-10" data-field="posy" class="px-2 py-1 rounded border border-vj-border bg-vj-panel hover:bg-vj-panel2 transition-colors text-xs text-white">-</button>
+                                    <input id="posy" type="number" min="-50000" max="50000" step="0.1" class="w-full px-2 py-1 rounded border border-vj-border bg-vj-panel font-mono text-sm text-gray-100">
+                                    <button data-step="10" data-field="posy" class="px-2 py-1 rounded border border-vj-border bg-vj-panel hover:bg-vj-panel2 transition-colors text-xs text-white">+</button>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-gray-400 mb-1">Pos Z</div>
+                                <div class="flex items-center gap-1">
+                                    <button data-step="-10" data-field="posz" class="px-2 py-1 rounded border border-vj-border bg-vj-panel hover:bg-vj-panel2 transition-colors text-xs text-white">-</button>
+                                    <input id="posz" type="number" min="-50000" max="50000" step="0.1" class="w-full px-2 py-1 rounded border border-vj-border bg-vj-panel font-mono text-sm text-gray-100">
+                                    <button data-step="10" data-field="posz" class="px-2 py-1 rounded border border-vj-border bg-vj-panel hover:bg-vj-panel2 transition-colors text-xs text-white">+</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <div class="text-xs text-gray-400 mb-1">Rot X</div>
+                                <div class="flex items-center gap-1">
+                                    <button data-step="-1" data-field="rotx" class="px-2 py-1 rounded border border-vj-border bg-vj-panel hover:bg-vj-panel2 transition-colors text-xs text-white">-</button>
+                                    <input id="rotx" type="number" min="-180" max="180" step="1" class="w-full px-2 py-1 rounded border border-vj-border bg-vj-panel font-mono text-sm text-gray-100">
+                                    <button data-step="1" data-field="rotx" class="px-2 py-1 rounded border border-vj-border bg-vj-panel hover:bg-vj-panel2 transition-colors text-xs text-white">+</button>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-gray-400 mb-1">Rot Y</div>
+                                <div class="flex items-center gap-1">
+                                    <button data-step="-1" data-field="roty" class="px-2 py-1 rounded border border-vj-border bg-vj-panel hover:bg-vj-panel2 transition-colors text-xs text-white">-</button>
+                                    <input id="roty" type="number" min="-180" max="180" step="1" class="w-full px-2 py-1 rounded border border-vj-border bg-vj-panel font-mono text-sm text-gray-100">
+                                    <button data-step="1" data-field="roty" class="px-2 py-1 rounded border border-vj-border bg-vj-panel hover:bg-vj-panel2 transition-colors text-xs text-white">+</button>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-gray-400 mb-1">Rot Z</div>
+                                <div class="flex items-center gap-1">
+                                    <button data-step="-1" data-field="rotz" class="px-2 py-1 rounded border border-vj-border bg-vj-panel hover:bg-vj-panel2 transition-colors text-xs text-white">-</button>
+                                    <input id="rotz" type="number" min="-180" max="180" step="1" class="w-full px-2 py-1 rounded border border-vj-border bg-vj-panel font-mono text-sm text-gray-100">
+                                    <button data-step="1" data-field="rotz" class="px-2 py-1 rounded border border-vj-border bg-vj-panel hover:bg-vj-panel2 transition-colors text-xs text-white">+</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="inspector-multi" class="hidden mt-3 space-y-3">
+                        <div class="text-sm text-gray-400">Selección múltiple activa. Ajusta el grupo (centroide) o usa el gizmo.</div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <div class="text-xs text-gray-400 mb-1">Grupo X</div>
+                                <input id="gposx" type="number" min="-50000" max="50000" step="0.1" class="w-full px-2 py-1 rounded border border-vj-border bg-vj-panel font-mono text-sm text-gray-100">
+                            </div>
+                            <div>
+                                <div class="text-xs text-gray-400 mb-1">Grupo Y</div>
+                                <input id="gposy" type="number" min="-50000" max="50000" step="0.1" class="w-full px-2 py-1 rounded border border-vj-border bg-vj-panel font-mono text-sm text-gray-100">
+                            </div>
+                            <div>
+                                <div class="text-xs text-gray-400 mb-1">Grupo Z</div>
+                                <input id="gposz" type="number" min="-50000" max="50000" step="0.1" class="w-full px-2 py-1 rounded border border-vj-border bg-vj-panel font-mono text-sm text-gray-100">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <div class="text-xs text-gray-400 mb-1">Rot X</div>
+                                <input id="grotx" type="number" min="-180" max="180" step="1" class="w-full px-2 py-1 rounded border border-vj-border bg-vj-panel font-mono text-sm text-gray-100">
+                            </div>
+                            <div>
+                                <div class="text-xs text-gray-400 mb-1">Rot Y</div>
+                                <input id="groty" type="number" min="-180" max="180" step="1" class="w-full px-2 py-1 rounded border border-vj-border bg-vj-panel font-mono text-sm text-gray-100">
+                            </div>
+                            <div>
+                                <div class="text-xs text-gray-400 mb-1">Rot Z</div>
+                                <input id="grotz" type="number" min="-180" max="180" step="1" class="w-full px-2 py-1 rounded border border-vj-border bg-vj-panel font-mono text-sm text-gray-100">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <details class="bg-vj-panel2/20 rounded-xl p-4 shadow-lg border border-vj-border" open>
+                    <summary class="cursor-pointer list-none flex items-center justify-between gap-3">
+                        <span class="text-base font-semibold text-white">Pantallas</span>
+                        <button id="download-btn" class="bg-vj-panel2 hover:bg-vj-panel text-white px-3 py-1.5 rounded-lg font-medium transition-colors shadow-lg border border-vj-border">
+                            Exportar CSV
+                        </button>
+                    </summary>
+                    <div class="mt-3">
+                        <input id="screen-filter" type="text" placeholder="Filtrar…" class="w-full px-3 py-2 rounded border border-vj-border bg-vj-panel text-gray-100 text-sm">
+                    </div>
+                    <div class="mt-3 overflow-y-auto max-h-[45vh] pr-2">
+                        <ul id="data-list" class="space-y-2 list-disc list-inside"></ul>
+                    </div>
+                </details>
+
+                <div id="testing-panel" class="hidden bg-vj-panel2/20 rounded-xl p-4 shadow-lg border border-vj-border">
+                    <div class="flex items-center justify-between gap-3">
+                        <h2 class="text-base font-semibold text-white">Testing</h2>
+                        <button id="run-tests-btn" class="text-sm px-3 py-1.5 rounded-lg border border-vj-border bg-vj-panel2 hover:bg-vj-panel transition-colors">
+                            Ejecutar tests
+                        </button>
+                    </div>
+                    <div class="mt-3">
+                        <ul id="test-results" class="hidden list-disc list-inside text-sm space-y-1"></ul>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.165.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module" src="js/three-viewer.js"></script>
+</body>
+</html>
