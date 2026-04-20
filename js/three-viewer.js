@@ -257,6 +257,8 @@ spoutTexture.colorSpace = THREE.SRGBColorSpace;
 spoutTexture.generateMipmaps = false;
 spoutTexture.minFilter = THREE.LinearFilter;
 spoutTexture.magFilter = THREE.LinearFilter;
+spoutTexture.wrapS = THREE.ClampToEdgeWrapping;
+spoutTexture.wrapT = THREE.ClampToEdgeWrapping;
 spoutTexture.flipY = true; // El servidor ya envía la imagen al derecho, así que usamos el default flipY=true de WebGL
 let spoutEnabled = false;
 let wsSpout = null;
@@ -345,12 +347,8 @@ function connectSpoutWebSocket() {
 connectSpoutWebSocket();
 
 function updateSpoutMaterials() {
-    // Calculamos el bounding box de todos los slices actuales para saber si
-    // necesitamos compensar las coordenadas (útil cuando se envía Spout desde un Screen específico)
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
+    let maxX = 0;
+    let maxY = 0;
     
     for (const s of currentScreens) {
         const rectToUse = rectMode === 'output' ? (s.outputRect || s.inputRect) : s.inputRect;
@@ -358,19 +356,17 @@ function updateSpoutMaterials() {
         const y = Number(rectToUse.y) || 0;
         const w = Number(rectToUse.w) || 1;
         const h = Number(rectToUse.h) || 1;
-        if (x < minX) minX = x;
-        if (y < minY) minY = y;
         if (x + w > maxX) maxX = x + w;
         if (y + h > maxY) maxY = y + h;
     }
-    if (minX === Infinity) { minX = 0; minY = 0; maxX = 100; maxY = 100; }
     
-    // Si la resolución del Spout coincide muy de cerca con el bounding box de los slices,
-    // significa que Resolume ha recortado la textura al tamaño del Screen.
-    const isCroppedScreen = Math.abs(lastSpoutWidth - (maxX - minX)) < 10 && Math.abs(lastSpoutHeight - (maxY - minY)) < 10;
-    
-    const offsetX = isCroppedScreen ? minX : 0;
-    const offsetY = isCroppedScreen ? minY : 0;
+    // El Spout de un Screen puede tener una resolución menor (ej. 800x600) que las coordenadas
+    // del XML (ej. 1920x1080) si Resolume escaló los slices para ajustarse al Screen, pero
+    // el XML sigue teniendo las dimensiones globales.
+    // Usar el máximo entre el tamaño del Spout y el bounding box asegura que las coordenadas
+    // UV se normalicen correctamente sin exceder 1.0 (evitando la repetición).
+    const scaleX = Math.max(lastSpoutWidth, maxX) || 1;
+    const scaleY = Math.max(lastSpoutHeight, maxY) || 1;
 
     for (const s of currentScreens) {
         const mat = materialsByName.get(s.name);
@@ -381,7 +377,7 @@ function updateSpoutMaterials() {
             mat.map = spoutTexture;
             mat.color.setHex(0xffffff);
             mat.emissive.setHex(0x000000);
-            updateUVsForSpout(mesh, s, offsetX, offsetY);
+            updateUVsForSpout(mesh, s, scaleX, scaleY);
         } else {
             if (!mat.userData.fallbackTexture) {
                 mat.userData.fallbackTexture = makeScreenTexture(s.name, 1024);
@@ -395,7 +391,7 @@ function updateSpoutMaterials() {
     }
 }
 
-function updateUVsForSpout(mesh, screen, offsetX = 0, offsetY = 0) {
+function updateUVsForSpout(mesh, screen, scaleX = 1, scaleY = 1) {
     if (!mesh.geometry || !screen.inputRect || lastSpoutWidth === 0 || lastSpoutHeight === 0) return;
     
     const uvs = mesh.geometry.attributes.uv;
@@ -403,17 +399,16 @@ function updateUVsForSpout(mesh, screen, offsetX = 0, offsetY = 0) {
     
     const rectToUse = rectMode === 'output' ? (screen.outputRect || screen.inputRect) : screen.inputRect;
     
-    // Aplicamos el offset calculado (será > 0 si viene de un Screen recortado)
-    const x = (Number(rectToUse.x) || 0) - offsetX;
-    const y = (Number(rectToUse.y) || 0) - offsetY;
+    const x = Number(rectToUse.x) || 0;
+    const y = Number(rectToUse.y) || 0;
     const w = Number(rectToUse.w) || 1;
     const h = Number(rectToUse.h) || 1;
     
-    const u0 = x / lastSpoutWidth;
-    const u1 = (x + w) / lastSpoutWidth;
+    const u0 = x / scaleX;
+    const u1 = (x + w) / scaleX;
     
-    const v_top = 1.0 - (y / lastSpoutHeight);
-    const v_bottom = 1.0 - ((y + h) / lastSpoutHeight);
+    const v_top = 1.0 - (y / scaleY);
+    const v_bottom = 1.0 - ((y + h) / scaleY);
     
     uvs.setXY(0, u0, v_top);
     uvs.setXY(1, u1, v_top);
