@@ -261,6 +261,7 @@ spoutTexture.wrapS = THREE.ClampToEdgeWrapping;
 spoutTexture.wrapT = THREE.ClampToEdgeWrapping;
 spoutTexture.flipY = true; // El servidor ya envía la imagen al derecho, así que usamos el default flipY=true de WebGL
 let spoutEnabled = false;
+let currentSpoutSender = '';
 let wsSpout = null;
 let lastSpoutWidth = 0;
 let lastSpoutHeight = 0;
@@ -277,7 +278,8 @@ function updateSpoutUI() {
     statusDiv.classList.remove('hidden');
     if (spoutEnabled) {
         indicator.className = 'w-2 h-2 rounded-full bg-green-500';
-        text.textContent = `Spout: Conectado (${lastSpoutWidth}x${lastSpoutHeight}) - ${spoutFps} FPS`;
+        const senderLabel = currentSpoutSender ? `[${currentSpoutSender}] ` : '';
+        text.textContent = `Spout: Conectado ${senderLabel}(${lastSpoutWidth}x${lastSpoutHeight}) - ${spoutFps} FPS`;
     } else {
         indicator.className = 'w-2 h-2 rounded-full bg-red-500';
         text.textContent = 'Spout: Buscando...';
@@ -307,6 +309,7 @@ function connectSpoutWebSocket() {
             const msg = JSON.parse(e.data);
             if (msg.type === 'status') {
                 spoutEnabled = msg.connected;
+                currentSpoutSender = msg.sender || '';
                 updateSpoutMaterials();
                 updateSpoutUI();
             }
@@ -347,26 +350,58 @@ function connectSpoutWebSocket() {
 connectSpoutWebSocket();
 
 function updateSpoutMaterials() {
-    let maxX = 0;
-    let maxY = 0;
+    let globalMaxX = 0;
+    let globalMaxY = 0;
+    
+    const screenOutBounds = new Map();
     
     for (const s of currentScreens) {
-        const rectToUse = rectMode === 'output' ? (s.outputRect || s.inputRect) : s.inputRect;
-        const x = Number(rectToUse.x) || 0;
-        const y = Number(rectToUse.y) || 0;
-        const w = Number(rectToUse.w) || 1;
-        const h = Number(rectToUse.h) || 1;
-        if (x + w > maxX) maxX = x + w;
-        if (y + h > maxY) maxY = y + h;
+        // Límites globales
+        const rectLayout = rectMode === 'output' ? (s.outputRect || s.inputRect) : s.inputRect;
+        const lx = Number(rectLayout.x) || 0;
+        const ly = Number(rectLayout.y) || 0;
+        const lw = Number(rectLayout.w) || 1;
+        const lh = Number(rectLayout.h) || 1;
+        if (lx + lw > globalMaxX) globalMaxX = lx + lw;
+        if (ly + lh > globalMaxY) globalMaxY = ly + lh;
+        
+        // Límites de salida (OutputRect) por pantalla (Screen)
+        const screenName = s.screen || 'default';
+        if (!screenOutBounds.has(screenName)) {
+            screenOutBounds.set(screenName, { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
+        }
+        const b = screenOutBounds.get(screenName);
+        const outX = Number(s.outputRect?.x) || 0;
+        const outY = Number(s.outputRect?.y) || 0;
+        const outW = Number(s.outputRect?.w) || 1;
+        const outH = Number(s.outputRect?.h) || 1;
+        
+        if (outX < b.minX) b.minX = outX;
+        if (outY < b.minY) b.minY = outY;
+        if (outX + outW > b.maxX) b.maxX = outX + outW;
+        if (outY + outH > b.maxY) b.maxY = outY + outH;
     }
     
-    // El Spout de un Screen puede tener una resolución menor (ej. 800x600) que las coordenadas
-    // del XML (ej. 1920x1080) si Resolume escaló los slices para ajustarse al Screen, pero
-    // el XML sigue teniendo las dimensiones globales.
-    // Usar el máximo entre el tamaño del Spout y el bounding box asegura que las coordenadas
-    // UV se normalicen correctamente sin exceder 1.0 (evitando la repetición).
-    const scaleX = Math.max(lastSpoutWidth, maxX) || 1;
-    const scaleY = Math.max(lastSpoutHeight, maxY) || 1;
+    // Detectar si la textura de Spout corresponde a un Screen específico (Advanced Output)
+    // o si es la Composition entera.
+    let matchedScreen = null;
+    const isComposition = currentSpoutSender && currentSpoutSender.toLowerCase().includes('composition');
+    
+    if (!isComposition) {
+        for (const [sName, b] of screenOutBounds.entries()) {
+            const w = b.maxX - b.minX;
+            const h = b.maxY - b.minY;
+            
+            const nameMatch = currentSpoutSender && sName && currentSpoutSender.toLowerCase().includes(sName.toLowerCase());
+            // Tolerancia mayor por si hay redondeos o bordes negros
+            const sizeMatch = Math.abs(lastSpoutWidth - w) < 20 && Math.abs(lastSpoutHeight - h) < 20;
+            
+            if (nameMatch || sizeMatch) {
+                matchedScreen = { name: sName, bounds: b };
+                break;
+            }
+        }
+    }
 
     for (const s of currentScreens) {
         const mat = materialsByName.get(s.name);
@@ -377,7 +412,45 @@ function updateSpoutMaterials() {
             mat.map = spoutTexture;
             mat.color.setHex(0xffffff);
             mat.emissive.setHex(0x000000);
-            updateUVsForSpout(mesh, s, scaleX, scaleY);
+            
+            let u0 = 0, u1 = 1, v_top = 1, v_bottom = 0;
+            
+            if (matchedScreen && (s.screen || 'default') === matchedScreen.name) {
+                // La textura Spout es el OUTPUT de esta pantalla.
+                // Mapeamos usando las coordenadas OutputRect locales de esta pantalla.
+                const outX = Number(s.outputRect?.x) || 0;
+                const outY = Number(s.outputRect?.y) || 0;
+                const outW = Number(s.outputRect?.w) || 1;
+                const outH = Number(s.outputRect?.h) || 1;
+                
+                const localX = outX - matchedScreen.bounds.minX;
+                const localY = outY - matchedScreen.bounds.minY;
+                
+                u0 = localX / lastSpoutWidth;
+                u1 = (localX + outW) / lastSpoutWidth;
+                v_top = 1.0 - (localY / lastSpoutHeight);
+                v_bottom = 1.0 - ((localY + outH) / lastSpoutHeight);
+            } else if (matchedScreen) {
+                // La textura pertenece a otro Screen. Este slice se vuelve negro/vacío.
+                u0 = 0; u1 = 0; v_top = 0; v_bottom = 0;
+            } else {
+                // La textura es la Composition. Usamos las coordenadas actuales (input/output).
+                const rectToUse = rectMode === 'output' ? (s.outputRect || s.inputRect) : s.inputRect;
+                const x = Number(rectToUse.x) || 0;
+                const y = Number(rectToUse.y) || 0;
+                const w = Number(rectToUse.w) || 1;
+                const h = Number(rectToUse.h) || 1;
+                
+                const scaleX = Math.max(lastSpoutWidth, globalMaxX) || 1;
+                const scaleY = Math.max(lastSpoutHeight, globalMaxY) || 1;
+                
+                u0 = x / scaleX;
+                u1 = (x + w) / scaleX;
+                v_top = 1.0 - (y / scaleY);
+                v_bottom = 1.0 - ((y + h) / scaleY);
+            }
+            
+            updateUVsDirectly(mesh, u0, u1, v_top, v_bottom);
         } else {
             if (!mat.userData.fallbackTexture) {
                 mat.userData.fallbackTexture = makeScreenTexture(s.name, 1024);
@@ -391,24 +464,10 @@ function updateSpoutMaterials() {
     }
 }
 
-function updateUVsForSpout(mesh, screen, scaleX = 1, scaleY = 1) {
-    if (!mesh.geometry || !screen.inputRect || lastSpoutWidth === 0 || lastSpoutHeight === 0) return;
-    
+function updateUVsDirectly(mesh, u0, u1, v_top, v_bottom) {
+    if (!mesh.geometry) return;
     const uvs = mesh.geometry.attributes.uv;
     if (!uvs) return;
-    
-    const rectToUse = rectMode === 'output' ? (screen.outputRect || screen.inputRect) : screen.inputRect;
-    
-    const x = Number(rectToUse.x) || 0;
-    const y = Number(rectToUse.y) || 0;
-    const w = Number(rectToUse.w) || 1;
-    const h = Number(rectToUse.h) || 1;
-    
-    const u0 = x / scaleX;
-    const u1 = (x + w) / scaleX;
-    
-    const v_top = 1.0 - (y / scaleY);
-    const v_bottom = 1.0 - ((y + h) / scaleY);
     
     uvs.setXY(0, u0, v_top);
     uvs.setXY(1, u1, v_top);
