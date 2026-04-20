@@ -345,6 +345,33 @@ function connectSpoutWebSocket() {
 connectSpoutWebSocket();
 
 function updateSpoutMaterials() {
+    // Calculamos el bounding box de todos los slices actuales para saber si
+    // necesitamos compensar las coordenadas (útil cuando se envía Spout desde un Screen específico)
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    
+    for (const s of currentScreens) {
+        const rectToUse = rectMode === 'output' ? (s.outputRect || s.inputRect) : s.inputRect;
+        const x = Number(rectToUse.x) || 0;
+        const y = Number(rectToUse.y) || 0;
+        const w = Number(rectToUse.w) || 1;
+        const h = Number(rectToUse.h) || 1;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x + w > maxX) maxX = x + w;
+        if (y + h > maxY) maxY = y + h;
+    }
+    if (minX === Infinity) { minX = 0; minY = 0; maxX = 100; maxY = 100; }
+    
+    // Si la resolución del Spout coincide muy de cerca con el bounding box de los slices,
+    // significa que Resolume ha recortado la textura al tamaño del Screen.
+    const isCroppedScreen = Math.abs(lastSpoutWidth - (maxX - minX)) < 10 && Math.abs(lastSpoutHeight - (maxY - minY)) < 10;
+    
+    const offsetX = isCroppedScreen ? minX : 0;
+    const offsetY = isCroppedScreen ? minY : 0;
+
     for (const s of currentScreens) {
         const mat = materialsByName.get(s.name);
         const mesh = meshesByName.get(s.name);
@@ -354,7 +381,7 @@ function updateSpoutMaterials() {
             mat.map = spoutTexture;
             mat.color.setHex(0xffffff);
             mat.emissive.setHex(0x000000);
-            updateUVsForSpout(mesh, s);
+            updateUVsForSpout(mesh, s, offsetX, offsetY);
         } else {
             if (!mat.userData.fallbackTexture) {
                 mat.userData.fallbackTexture = makeScreenTexture(s.name, 1024);
@@ -368,36 +395,26 @@ function updateSpoutMaterials() {
     }
 }
 
-function updateUVsForSpout(mesh, screen) {
+function updateUVsForSpout(mesh, screen, offsetX = 0, offsetY = 0) {
     if (!mesh.geometry || !screen.inputRect || lastSpoutWidth === 0 || lastSpoutHeight === 0) return;
     
     const uvs = mesh.geometry.attributes.uv;
     if (!uvs) return;
     
-    const r = screen.inputRect;
-    const x = Number(r.x) || 0;
-    const y = Number(r.y) || 0;
-    const w = Number(r.w) || 1;
-    const h = Number(r.h) || 1;
+    const rectToUse = rectMode === 'output' ? (screen.outputRect || screen.inputRect) : screen.inputRect;
     
-    // The image from Spout is effectively vertically flipped (OpenGL origin is bottom-left).
-    // In Resolume, (x=0, y=0) is the top-left of the composition.
-    // So we must sample from the "flipped" texture.
-    // Let's just calculate standard UVs (where v=1 is top, v=0 is bottom in Three.js).
-    // The top of the Resolume composition (y=0) corresponds to the BOTTOM of our flipped Spout texture (v=0).
-    // The bottom of the Resolume composition (y+h) corresponds to the TOP of our flipped Spout texture (v=(y+h)/height).
+    // Aplicamos el offset calculado (será > 0 si viene de un Screen recortado)
+    const x = (Number(rectToUse.x) || 0) - offsetX;
+    const y = (Number(rectToUse.y) || 0) - offsetY;
+    const w = Number(rectToUse.w) || 1;
+    const h = Number(rectToUse.h) || 1;
     
     const u0 = x / lastSpoutWidth;
     const u1 = (x + w) / lastSpoutWidth;
     
-    // El backend ahora solo aplica flip() (vertical), enviando la imagen derecha y sin espejar.
-    // Three.js usa flipY=true (por defecto), por lo que v=1 es el "cielo" y v=0 es el "suelo".
-    // Resolume define y=0 como el techo de la composición. Por ende, y=0 mapea a v=1.
     const v_top = 1.0 - (y / lastSpoutHeight);
     const v_bottom = 1.0 - ((y + h) / lastSpoutHeight);
     
-    // Y asignamos las coordenadas en el orden que Three.js espera para un Plane (boca abajo -> boca arriba):
-    // 0: top-left, 1: top-right, 2: bottom-left, 3: bottom-right
     uvs.setXY(0, u0, v_top);
     uvs.setXY(1, u1, v_top);
     uvs.setXY(2, u0, v_bottom);
