@@ -23,7 +23,13 @@
         <div id="results-area" class="w-full">
             <div class="bg-vj-panel rounded-xl p-4 shadow-lg border border-vj-border">
                 <div class="flex items-center justify-between gap-3 mb-4">
-                    <h2 class="text-xl font-semibold text-white">Vista 3D</h2>
+                    <div class="flex items-center gap-3">
+                        <h2 class="text-xl font-semibold text-white">Vista 3D</h2>
+                        <div id="spout-status" class="hidden text-xs px-2 py-1 rounded-full border border-vj-border bg-vj-panel2 flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-red-500" id="spout-indicator"></span>
+                            <span id="spout-text" class="text-gray-300">Spout: Desconectado</span>
+                        </div>
+                    </div>
                     <span id="slice-count" class="text-sm bg-vj-cyan/15 text-vj-cyan px-3 py-1 rounded-full font-mono"></span>
                 </div>
 

@@ -1,0 +1,29 @@
+{
+  "name": "xml_to_csv",
+  "version": "1.0.0",
+  "description": "Webapp para importar exports XML/JSON de Resolume, visualizar las pantallas/slices en 3D, editar transformaciones y exportar a CSV (incluyendo rotación) con mapeo compatible con Unreal.",
+  "main": "spout_server.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tolchx/Resolume-Pixelmap-preview-3D.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/tolchx/Resolume-Pixelmap-preview-3D/issues"
+  },
+  "homepage": "https://github.com/tolchx/Resolume-Pixelmap-preview-3D#readme",
+  "dependencies": {
+    "@napolab/texture-bridge": "^0.9.0",
+    "express": "^5.2.1",
+    "sharp": "^0.34.5",
+    "ws": "^8.20.0"
+  }
+}

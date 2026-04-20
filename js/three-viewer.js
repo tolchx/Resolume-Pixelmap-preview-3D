@@ -9,8 +9,10 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b1220);
 
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 100000);
-camera.position.set(0, 300, 500);
-camera.up.set(0, 0, 1);
+// Para alinear con la perspectiva de la imagen (Eje X derecha rojo, Eje Y arriba verde, Eje Z hacia nosotros azul):
+// Ponemos la cámara mirando desde una posición Z+ pero ligeramente elevada y a la derecha
+camera.position.set(0, 0, 500); 
+camera.up.set(0, 1, 0); // Eje Y es hacia arriba
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
 renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
@@ -48,11 +50,11 @@ const navState = {
     invertX: false,
     invertY: false,
     pitch: 0,
-    yaw: 0
+    yaw: -Math.PI / 2
 };
 const navVel = new THREE.Vector3();
 const navKeys = { w: false, a: false, s: false, d: false, q: false, e: false };
-const navUp = new THREE.Vector3(0, 0, 1);
+const navUp = new THREE.Vector3(0, 1, 0);
 const navTmpForward = new THREE.Vector3();
 const navTmpRight = new THREE.Vector3();
 const navTmpMove = new THREE.Vector3();
@@ -248,6 +250,174 @@ let activePreSnapshot = null;
 const undoStack = [];
 const redoStack = [];
 const maxHistory = 50;
+
+// Spout variables
+let spoutTexture = new THREE.Texture();
+spoutTexture.colorSpace = THREE.SRGBColorSpace;
+spoutTexture.generateMipmaps = false;
+spoutTexture.minFilter = THREE.LinearFilter;
+spoutTexture.magFilter = THREE.LinearFilter;
+spoutTexture.flipY = true; // El servidor ya envía la imagen al derecho, así que usamos el default flipY=true de WebGL
+let spoutEnabled = false;
+let wsSpout = null;
+let lastSpoutWidth = 0;
+let lastSpoutHeight = 0;
+let spoutFrames = 0;
+let spoutFps = 0;
+let lastSpoutTime = 0;
+
+function updateSpoutUI() {
+    const statusDiv = document.getElementById('spout-status');
+    const indicator = document.getElementById('spout-indicator');
+    const text = document.getElementById('spout-text');
+    if (!statusDiv) return;
+    
+    statusDiv.classList.remove('hidden');
+    if (spoutEnabled) {
+        indicator.className = 'w-2 h-2 rounded-full bg-green-500';
+        text.textContent = `Spout: Conectado (${lastSpoutWidth}x${lastSpoutHeight}) - ${spoutFps} FPS`;
+    } else {
+        indicator.className = 'w-2 h-2 rounded-full bg-red-500';
+        text.textContent = 'Spout: Buscando...';
+    }
+}
+
+setInterval(() => {
+    if (spoutEnabled) {
+        spoutFps = spoutFrames;
+        spoutFrames = 0;
+        updateSpoutUI();
+    }
+}, 1000);
+
+function connectSpoutWebSocket() {
+    if (wsSpout) return;
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    wsSpout = new WebSocket(`${protocol}//${window.location.host}`);
+    wsSpout.binaryType = 'blob';
+    
+    wsSpout.onopen = () => {
+        console.log('Connected to Spout WebSocket');
+    };
+    
+    wsSpout.onmessage = async (e) => {
+        if (typeof e.data === 'string') {
+            const msg = JSON.parse(e.data);
+            if (msg.type === 'status') {
+                spoutEnabled = msg.connected;
+                updateSpoutMaterials();
+                updateSpoutUI();
+            }
+        } else if (e.data instanceof Blob) {
+            try {
+                const bmp = await createImageBitmap(e.data);
+                if (spoutTexture.image) {
+                    spoutTexture.image.close && spoutTexture.image.close();
+                }
+                spoutTexture.image = bmp;
+                spoutTexture.needsUpdate = true;
+                
+                spoutFrames++;
+                
+                if (bmp.width !== lastSpoutWidth || bmp.height !== lastSpoutHeight) {
+                    lastSpoutWidth = bmp.width;
+                    lastSpoutHeight = bmp.height;
+                    updateSpoutMaterials();
+                    updateSpoutUI();
+                }
+            } catch (err) {
+                console.error('Error decoding Spout frame:', err);
+            }
+        }
+    };
+    
+    wsSpout.onclose = () => {
+        console.log('Disconnected from Spout WebSocket. Retrying...');
+        wsSpout = null;
+        spoutEnabled = false;
+        lastSpoutWidth = 0;
+        lastSpoutHeight = 0;
+        updateSpoutMaterials();
+        updateSpoutUI();
+        setTimeout(connectSpoutWebSocket, 3000);
+    };
+}
+connectSpoutWebSocket();
+
+function updateSpoutMaterials() {
+    for (const s of currentScreens) {
+        const mat = materialsByName.get(s.name);
+        const mesh = meshesByName.get(s.name);
+        if (!mat || !mesh) continue;
+        
+        if (spoutEnabled && lastSpoutWidth > 0 && lastSpoutHeight > 0) {
+            mat.map = spoutTexture;
+            mat.color.setHex(0xffffff);
+            mat.emissive.setHex(0x000000);
+            updateUVsForSpout(mesh, s);
+        } else {
+            if (!mat.userData.fallbackTexture) {
+                mat.userData.fallbackTexture = makeScreenTexture(s.name, 1024);
+            }
+            mat.map = mat.userData.fallbackTexture;
+            mat.color.setHex(0xffffff);
+            mat.emissive.setHex(0x000000);
+            resetUVs(mesh);
+        }
+        mat.needsUpdate = true;
+    }
+}
+
+function updateUVsForSpout(mesh, screen) {
+    if (!mesh.geometry || !screen.inputRect || lastSpoutWidth === 0 || lastSpoutHeight === 0) return;
+    
+    const uvs = mesh.geometry.attributes.uv;
+    if (!uvs) return;
+    
+    const r = screen.inputRect;
+    const x = Number(r.x) || 0;
+    const y = Number(r.y) || 0;
+    const w = Number(r.w) || 1;
+    const h = Number(r.h) || 1;
+    
+    // The image from Spout is effectively vertically flipped (OpenGL origin is bottom-left).
+    // In Resolume, (x=0, y=0) is the top-left of the composition.
+    // So we must sample from the "flipped" texture.
+    // Let's just calculate standard UVs (where v=1 is top, v=0 is bottom in Three.js).
+    // The top of the Resolume composition (y=0) corresponds to the BOTTOM of our flipped Spout texture (v=0).
+    // The bottom of the Resolume composition (y+h) corresponds to the TOP of our flipped Spout texture (v=(y+h)/height).
+    
+    const u0 = x / lastSpoutWidth;
+    const u1 = (x + w) / lastSpoutWidth;
+    
+    // El backend ahora solo aplica flip() (vertical), enviando la imagen derecha y sin espejar.
+    // Three.js usa flipY=true (por defecto), por lo que v=1 es el "cielo" y v=0 es el "suelo".
+    // Resolume define y=0 como el techo de la composición. Por ende, y=0 mapea a v=1.
+    const v_top = 1.0 - (y / lastSpoutHeight);
+    const v_bottom = 1.0 - ((y + h) / lastSpoutHeight);
+    
+    // Y asignamos las coordenadas en el orden que Three.js espera para un Plane (boca abajo -> boca arriba):
+    // 0: top-left, 1: top-right, 2: bottom-left, 3: bottom-right
+    uvs.setXY(0, u0, v_top);
+    uvs.setXY(1, u1, v_top);
+    uvs.setXY(2, u0, v_bottom);
+    uvs.setXY(3, u1, v_bottom);
+    uvs.needsUpdate = true;
+}
+
+function resetUVs(mesh) {
+    if (!mesh.geometry) return;
+    const uvs = mesh.geometry.attributes.uv;
+    if (!uvs) return;
+    
+    // Restauramos el mapeo estándar. La textura de fallback (CanvasTexture)
+    // tiene flipY=true por defecto en Three.js, por lo que v=1 es el top.
+    uvs.setXY(0, 0, 1);
+    uvs.setXY(1, 1, 1);
+    uvs.setXY(2, 0, 0);
+    uvs.setXY(3, 1, 0);
+    uvs.needsUpdate = true;
+}
 let projectKey = '';
 let autosaveTimer = null;
 let workspaceBox = null;
@@ -550,7 +720,7 @@ function focus(name) {
 
     const nextTarget = center.clone();
     const nextPos = nextTarget.clone().add(viewDir.multiplyScalar(dist)).add(new THREE.Vector3(0, dist * 0.25, 0));
-    const nextUp = new THREE.Vector3(0, 0, 1);
+    const nextUp = new THREE.Vector3(0, 1, 0);
 
     const token = ++focusAnimToken;
     const startTs = performance.now();
@@ -673,7 +843,9 @@ function applyLayoutToMesh(mesh, screen, bounds, forcePosition) {
 
     if (forcePosition) {
         const x = (Number(r.x) - bounds.minX) * sizeScale + w / 2;
-        const y = (Number(r.y) - bounds.minY) * sizeScale + h / 2;
+        // Invertimos el cálculo de Y: Resolume Y crece hacia abajo, Three.js Y crece hacia arriba.
+        // Esto coloca el tope de las pantallas (Y=0 en Resolume) en Y=0 en Three.js y bajan hacia -Y.
+        const y = - (Number(r.y) - bounds.minY) * sizeScale - h / 2;
         mesh.position.set(x, y, 0);
     }
 }
@@ -692,9 +864,11 @@ function setScreens(screens) {
             emissive: 0x000000,
             side: THREE.DoubleSide
         });
-        mat.map = makeScreenTexture(s.name, 1024);
-        mat.map.wrapS = THREE.ClampToEdgeWrapping;
-        mat.map.wrapT = THREE.ClampToEdgeWrapping;
+        const tex = makeScreenTexture(s.name, 1024);
+        tex.wrapS = THREE.ClampToEdgeWrapping;
+        tex.wrapT = THREE.ClampToEdgeWrapping;
+        mat.map = tex;
+        mat.userData.fallbackTexture = tex;
         mat.needsUpdate = true;
         const mesh = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), mat);
         mesh.userData.name = s.name;
@@ -718,6 +892,7 @@ function setScreens(screens) {
     }
     workspaceBox = new THREE.Box3().setFromObject(group);
     applySavedState();
+    updateSpoutMaterials();
 }
 
 function setRectMode(mode) {
@@ -897,7 +1072,7 @@ function applyViewRotationDeg(deg) {
     const offset = new THREE.Vector3().subVectors(homePos, homeTarget);
     const nextOffset = offset.applyQuaternion(q);
     camera.position.copy(homeTarget).add(nextOffset);
-    camera.up.set(0, 0, 1).applyQuaternion(q);
+    camera.up.set(0, 1, 0).applyQuaternion(q);
     camera.lookAt(homeTarget);
     controls.target.copy(homeTarget);
     controls.update();
