@@ -560,6 +560,7 @@ function buildScreensFromRects(rects) {
             g = {
                 name: r.slice || basePath || r.sliceUid || 'SinNombre',
                 screen: r.screen || '',
+                sliceUid: r.sliceUid || '',
                 input: null,
                 output: null
             };
@@ -600,6 +601,8 @@ function buildScreensFromRects(rects) {
         screens.push({
             id,
             name: g.name,
+            screen: g.screen,
+            sliceUid: g.sliceUid,
             ancho,
             alto,
             outputRect,
@@ -751,7 +754,31 @@ downloadBtn.addEventListener('click', (e) => {
         e.stopPropagation();
     }
     if (!extractedScreens.length) return;
-    let csvContent = "Name,Ancho,Alto,PosX,PosY,InputX,InputY,InputW,InputH,Loc3D_X,Loc3D_Y,Loc3D_Z,Rot_P,Rot_Y,Rot_R\n";
+
+    let canvasW = 1920, canvasH = 1080;
+    const canvasMatch = lastImportedText.match(/<CurrentCompositionTextureSize\s+width=["']?(\d+)["']?\s+height=["']?(\d+)["']?/i);
+    if (canvasMatch) {
+        canvasW = Number(canvasMatch[1]);
+        canvasH = Number(canvasMatch[2]);
+    }
+
+    const ndiCache = new Map();
+    const screenRegex = /<Screen\s+name=["']([^"']+)["'][^>]*>([\s\S]*?)<\/Screen>/gi;
+    let sm;
+    while ((sm = screenRegex.exec(lastImportedText)) !== null) {
+        const screenName = sm[1];
+        const screenContent = sm[2];
+        const devMatchStr = screenContent.match(/<OutputDevice[A-Za-z]+([^>]+)>/i);
+        if (devMatchStr) {
+            const wMatch = devMatchStr[1].match(/\bwidth=["'](\d+)["']/i);
+            const hMatch = devMatchStr[1].match(/\bheight=["'](\d+)["']/i);
+            if (wMatch && hMatch) {
+                ndiCache.set(screenName, { w: Number(wMatch[1]), h: Number(hMatch[1]) });
+            }
+        }
+    }
+
+    let csvContent = "---,Screen,Out_W,Out_H,Out_X,Out_Y,NDI_W,NDI_H,Canvas_W,Canvas_H,In_X,In_Y,In_W,In_H,Loc3D_X,Loc3D_Y,Loc3D_Z,Rot_P,Rot_Y,Rot_R,ID_Interno,Mapping_Mode\n";
     for (const s of extractedScreens) {
         const state = screenStateByName.get(s.name) || {};
         const loc = state.loc3D || s.loc3D || { x: 0, y: 0, z: 0 };
@@ -762,12 +789,21 @@ downloadBtn.addEventListener('click', (e) => {
         const rotP = toCsvNumber(rot.z);
         const rotY = toCsvNumber(rot.y);
         const rotR = toCsvNumber(rot.x);
+        
+        const ndi = ndiCache.get(s.screen) || { w: canvasW, h: canvasH };
+        const idInterno = s.sliceUid || '0';
+
         const row = [
             escapeCSV(s.name),
-            toCsvNumber(s.ancho),
-            toCsvNumber(s.alto),
+            escapeCSV(s.screen),
+            toCsvNumber(s.outputRect?.w ?? 0),
+            toCsvNumber(s.outputRect?.h ?? 0),
             toCsvNumber(s.outputRect?.x ?? 0),
             toCsvNumber(s.outputRect?.y ?? 0),
+            toCsvNumber(ndi.w),
+            toCsvNumber(ndi.h),
+            toCsvNumber(canvasW),
+            toCsvNumber(canvasH),
             toCsvNumber(s.inputRect?.x ?? 0),
             toCsvNumber(s.inputRect?.y ?? 0),
             toCsvNumber(s.inputRect?.w ?? 0),
@@ -777,7 +813,9 @@ downloadBtn.addEventListener('click', (e) => {
             unrealZ,
             rotP,
             rotY,
-            rotR
+            rotR,
+            idInterno,
+            "Plano"
         ];
         csvContent += row.join(",") + "\n";
     }
