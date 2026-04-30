@@ -839,12 +839,16 @@ downloadBtn.addEventListener('click', (e) => {
     for (const s of extractedScreens) {
         const state = screenStateByName.get(s.name) || {};
         const loc = state.loc3D || s.loc3D || { x: 0, y: 0, z: 0 };
-        const locX = toCsvNumber(loc.x);
-        const locY = toCsvNumber(loc.y);
-        const locZ = toCsvNumber(loc.z);
+        // Conversión de ejes: Three.js (Y-up, mano derecha) → Unreal (Z-up, mano izquierda)
+        // Three X → Unreal X
+        // Three Y → Unreal Z (altura)
+        // Three Z → Unreal -Y (profundidad, negado por cambio de mano)
+        const unrealX = toCsvNumber(loc.x);
+        const unrealY = toCsvNumber(-loc.z);
+        const unrealZ = toCsvNumber(loc.y);
         const rot = state.rot3D || { x: 0, y: 0, z: 0 };
+        // Conversión de rotaciones: misma lógica de cambio de mano
         const rotP = toCsvNumber(rot.x);
-        // Negar Yaw: Three.js (mano derecha) → Unreal (mano izquierda) invierte el sentido de giro en Y
         const rotY = toCsvNumber(-rot.y);
         const rotR = toCsvNumber(rot.z);
         
@@ -868,9 +872,9 @@ downloadBtn.addEventListener('click', (e) => {
             toCsvNumber(s.inputRect?.y ?? 0),
             toCsvNumber(s.inputRect?.w ?? 0),
             toCsvNumber(s.inputRect?.h ?? 0),
-            locX,
-            locY,
-            locZ,
+            unrealX,
+            unrealY,
+            unrealZ,
             rotP,
             rotY,
             rotR,
