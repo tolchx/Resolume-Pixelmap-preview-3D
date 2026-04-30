@@ -844,7 +844,7 @@ downloadBtn.addEventListener('click', (e) => {
         // Three Y → Unreal Z (altura)
         // Three Z → Unreal -Y (profundidad, negado por cambio de mano)
         const unrealX = toCsvNumber(loc.x);
-        const unrealY = toCsvNumber(-loc.z);
+        const unrealY = toCsvNumber(loc.z);
         const unrealZ = toCsvNumber(loc.y);
         const rot = state.rot3D || { x: 0, y: 0, z: 0 };
         // Conversión de rotaciones: misma lógica de cambio de mano
