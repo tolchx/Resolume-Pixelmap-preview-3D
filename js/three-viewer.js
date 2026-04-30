@@ -985,6 +985,43 @@ function applyLayoutToMesh(mesh, screen, bounds, forcePosition) {
     }
 }
 
+function addScreen(s, bounds) {
+    const mat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        metalness: 0.1,
+        roughness: 0.35,
+        emissive: 0x000000,
+        side: THREE.DoubleSide
+    });
+    const tex = makeScreenTexture(s.name, 1024);
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    mat.map = tex;
+    mat.userData.fallbackTexture = tex;
+    mat.needsUpdate = true;
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), mat);
+    mesh.userData.name = s.name;
+    mesh.userData.screenInfo = s;
+    mesh.position.set(0, 100, 0);
+
+    const loc = s.loc3D || { x: 0, y: 0, z: 0 };
+    const isAllZero = !loc.x && !loc.y && !loc.z;
+    if (isAllZero) {
+        applyLayoutToMesh(mesh, s, bounds, true);
+        s.loc3D = { x: mesh.position.x, y: mesh.position.y, z: mesh.position.z };
+    } else {
+        mesh.position.set(Number(loc.x) || 0, Number(loc.y) || 0, Number(loc.z) || 0);
+        applyLayoutToMesh(mesh, s, bounds, false);
+    }
+
+    ensureOutline(mesh);
+    group.add(mesh);
+    meshesByName.set(s.name, mesh);
+    materialsByName.set(s.name, mat);
+    if (typeof window.onScreenMove3D === 'function') window.onScreenMove3D(s.name, { x: mesh.position.x, y: mesh.position.y, z: mesh.position.z });
+    return mesh;
+}
+
 function setScreens(screens) {
     clearScreens();
     if (!Array.isArray(screens) || !screens.length) return;
@@ -992,38 +1029,7 @@ function setScreens(screens) {
     const bounds = computeLayoutBounds(currentScreens);
 
     for (const s of currentScreens) {
-        const mat = new THREE.MeshStandardMaterial({
-            color: 0xffffff,
-            metalness: 0.1,
-            roughness: 0.35,
-            emissive: 0x000000,
-            side: THREE.DoubleSide
-        });
-        const tex = makeScreenTexture(s.name, 1024);
-        tex.wrapS = THREE.ClampToEdgeWrapping;
-        tex.wrapT = THREE.ClampToEdgeWrapping;
-        mat.map = tex;
-        mat.userData.fallbackTexture = tex;
-        mat.needsUpdate = true;
-        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), mat);
-        mesh.userData.name = s.name;
-        mesh.position.set(0, 100, 0);
-
-        const loc = s.loc3D || { x: 0, y: 0, z: 0 };
-        const isAllZero = !loc.x && !loc.y && !loc.z;
-        if (isAllZero) {
-            applyLayoutToMesh(mesh, s, bounds, true);
-            s.loc3D = { x: mesh.position.x, y: mesh.position.y, z: mesh.position.z };
-        } else {
-            mesh.position.set(Number(loc.x) || 0, Number(loc.y) || 0, Number(loc.z) || 0);
-            applyLayoutToMesh(mesh, s, bounds, false);
-        }
-
-        ensureOutline(mesh);
-        group.add(mesh);
-        meshesByName.set(s.name, mesh);
-        materialsByName.set(s.name, mat);
-        if (typeof window.onScreenMove3D === 'function') window.onScreenMove3D(s.name, { x: mesh.position.x, y: mesh.position.y, z: mesh.position.z });
+        addScreen(s, bounds);
     }
     workspaceBox = new THREE.Box3().setFromObject(group);
     applySavedState();
@@ -1052,7 +1058,8 @@ function snapshotAll() {
         out.push({
             name,
             p: [mesh.position.x, mesh.position.y, mesh.position.z],
-            q: [mesh.quaternion.x, mesh.quaternion.y, mesh.quaternion.z, mesh.quaternion.w]
+            q: [mesh.quaternion.x, mesh.quaternion.y, mesh.quaternion.z, mesh.quaternion.w],
+            screenInfo: mesh.userData.screenInfo ? JSON.parse(JSON.stringify(mesh.userData.screenInfo)) : null
         });
     }
     return out;
@@ -1060,8 +1067,31 @@ function snapshotAll() {
 
 function applySnapshot(snap) {
     if (!Array.isArray(snap)) return;
+
+    const namesInSnap = new Set(snap.map(i => i.name));
+    for (const [name, mesh] of meshesByName.entries()) {
+        if (!namesInSnap.has(name)) {
+            group.remove(mesh);
+            if (mesh.geometry) mesh.geometry.dispose();
+            if (mesh.material) mesh.material.dispose();
+            meshesByName.delete(name);
+            const outline = outlinesByName.get(name);
+            if (outline) {
+                scene.remove(outline);
+                if (outline.geometry) outline.geometry.dispose();
+                outlinesByName.delete(name);
+            }
+            materialsByName.delete(name);
+            userModifiedByName.delete(name);
+        }
+    }
+
+    const bounds = computeLayoutBounds(snap.map(i => i.screenInfo).filter(Boolean));
     for (const item of snap) {
-        const mesh = meshesByName.get(item.name);
+        let mesh = meshesByName.get(item.name);
+        if (!mesh && item.screenInfo) {
+            mesh = addScreen(item.screenInfo, bounds);
+        }
         if (!mesh) continue;
         mesh.position.set(item.p[0], item.p[1], item.p[2]);
         mesh.quaternion.set(item.q[0], item.q[1], item.q[2], item.q[3]);
@@ -1073,6 +1103,11 @@ function applySnapshot(snap) {
             z: THREE.MathUtils.radToDeg(mesh.rotation.z)
         });
     }
+    
+    window.dispatchEvent(new CustomEvent('screens-sync', { 
+        detail: { screens: snap.map(i => i.screenInfo).filter(Boolean) } 
+    }));
+    
     attachForSelection();
 }
 

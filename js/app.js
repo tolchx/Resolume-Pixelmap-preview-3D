@@ -114,6 +114,21 @@ window.addEventListener('screens-removed', (e) => {
     updateInspector();
 });
 
+window.addEventListener('screens-sync', (e) => {
+    const screens = e.detail?.screens;
+    if (!screens) return;
+    extractedScreens = screens.slice();
+    // Limpiar selección de nombres que ya no existen
+    const validNames = new Set(screens.map(s => s.name));
+    for (const name of selectedNames) {
+        if (!validNames.has(name)) selectedNames.delete(name);
+    }
+    if (!validNames.has(primarySelectedName)) {
+        primarySelectedName = Array.from(selectedNames)[0] || '';
+    }
+    renderScreensList(extractedScreens);
+    updateInspector();
+});
 function openDrawer() {
     sideDrawer.classList.remove('translate-x-full');
 }
