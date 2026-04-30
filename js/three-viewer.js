@@ -659,7 +659,8 @@ function attachForSelection() {
     }
     const center = computeCentroid(selectedSet);
     selectionProxy.position.copy(center);
-    selectionProxy.quaternion.identity();
+    selectionProxy.rotation.set(0, 0, 0);
+    selectionProxy.scale.set(1, 1, 1);
     selectionProxy.updateMatrixWorld(true);
     proxyLastMatrix.copy(selectionProxy.matrixWorld);
     selected = primarySelected || Array.from(selectedSet)[0];
@@ -691,7 +692,8 @@ function applyDeltaToSelected(delta, mode) {
         if (!m) continue;
         m.applyMatrix4(delta);
         clampPos(m);
-        if (snapEnabled && mode === 'translate') {
+        // Deshabilitar snap individual en transformaciones de grupo para no romper la relación espacial
+        if (selectedSet.size === 1 && snapEnabled && mode === 'translate') {
             const s = 10;
             m.position.x = Math.round(m.position.x / s) * s;
             m.position.y = Math.round(m.position.y / s) * s;

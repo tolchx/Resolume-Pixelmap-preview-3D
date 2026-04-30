@@ -835,6 +835,9 @@ downloadBtn.addEventListener('click', (e) => {
 });
 
 function toCsvNumber(n) {
+    if (typeof n === 'string') {
+        n = n.replace(',', '.');
+    }
     const v = Number(n);
     if (!Number.isFinite(v)) return 0;
     const r = Math.round(v * 1000) / 1000;
