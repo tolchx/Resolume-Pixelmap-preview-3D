@@ -815,19 +815,23 @@ downloadBtn.addEventListener('click', (e) => {
         canvasH = Number(canvasMatch[2]);
     }
 
+    // Compute NDI resolution per screen from the bounding box of all OutputRects
     const ndiCache = new Map();
-    const screenRegex = /<Screen\s+name=["']([^"']+)["'][^>]*>([\s\S]*?)<\/Screen>/gi;
-    let sm;
-    while ((sm = screenRegex.exec(lastImportedText)) !== null) {
-        const screenName = sm[1];
-        const screenContent = sm[2];
-        const devMatchStr = screenContent.match(/<OutputDevice[A-Za-z]+([^>]+)>/i);
-        if (devMatchStr) {
-            const wMatch = devMatchStr[1].match(/\bwidth=["'](\d+)["']/i);
-            const hMatch = devMatchStr[1].match(/\bheight=["'](\d+)["']/i);
-            if (wMatch && hMatch) {
-                ndiCache.set(screenName, { w: Number(wMatch[1]), h: Number(hMatch[1]) });
-            }
+    for (const s of extractedScreens) {
+        const screenName = s.screen || '';
+        if (!screenName) continue;
+        const outX = toCsvNumber(s.outputRect?.x ?? 0);
+        const outY = toCsvNumber(s.outputRect?.y ?? 0);
+        const outW = toCsvNumber(s.outputRect?.w ?? 0);
+        const outH = toCsvNumber(s.outputRect?.h ?? 0);
+        const rightEdge = outX + outW;
+        const bottomEdge = outY + outH;
+        const prev = ndiCache.get(screenName);
+        if (prev) {
+            prev.maxX = Math.max(prev.maxX, rightEdge);
+            prev.maxY = Math.max(prev.maxY, bottomEdge);
+        } else {
+            ndiCache.set(screenName, { maxX: rightEdge, maxY: bottomEdge });
         }
     }
 
@@ -835,15 +839,17 @@ downloadBtn.addEventListener('click', (e) => {
     for (const s of extractedScreens) {
         const state = screenStateByName.get(s.name) || {};
         const loc = state.loc3D || s.loc3D || { x: 0, y: 0, z: 0 };
-        const unrealX = toCsvNumber(loc.x);
-        const unrealY = toCsvNumber(loc.z);
-        const unrealZ = toCsvNumber(loc.y);
+        const locX = toCsvNumber(loc.x);
+        const locY = toCsvNumber(loc.y);
+        const locZ = toCsvNumber(loc.z);
         const rot = state.rot3D || { x: 0, y: 0, z: 0 };
-        const rotP = toCsvNumber(rot.z);
+        const rotP = toCsvNumber(rot.x);
         const rotY = toCsvNumber(rot.y);
-        const rotR = toCsvNumber(rot.x);
+        const rotR = toCsvNumber(rot.z);
         
-        const ndi = ndiCache.get(s.screen) || { w: canvasW, h: canvasH };
+        const ndiBounds = ndiCache.get(s.screen);
+        const ndiW = ndiBounds ? Math.ceil(ndiBounds.maxX) : canvasW;
+        const ndiH = ndiBounds ? Math.ceil(ndiBounds.maxY) : canvasH;
         const idInterno = s.sliceUid || '0';
 
         const row = [
@@ -853,17 +859,17 @@ downloadBtn.addEventListener('click', (e) => {
             toCsvNumber(s.outputRect?.h ?? 0),
             toCsvNumber(s.outputRect?.x ?? 0),
             toCsvNumber(s.outputRect?.y ?? 0),
-            toCsvNumber(ndi.w),
-            toCsvNumber(ndi.h),
+            ndiW,
+            ndiH,
             toCsvNumber(canvasW),
             toCsvNumber(canvasH),
             toCsvNumber(s.inputRect?.x ?? 0),
             toCsvNumber(s.inputRect?.y ?? 0),
             toCsvNumber(s.inputRect?.w ?? 0),
             toCsvNumber(s.inputRect?.h ?? 0),
-            unrealX,
-            unrealY,
-            unrealZ,
+            locX,
+            locY,
+            locZ,
             rotP,
             rotY,
             rotR,
