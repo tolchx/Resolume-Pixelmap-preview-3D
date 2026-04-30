@@ -99,6 +99,21 @@ window.addEventListener('three-ready', () => {
     setNavUiEnabled(false);
 });
 
+window.addEventListener('screens-removed', (e) => {
+    const names = e.detail?.names;
+    if (!names) return;
+    extractedScreens = extractedScreens.filter(s => !names.includes(s.name));
+    for (const name of names) {
+        screenStateByName.delete(name);
+        selectedNames.delete(name);
+    }
+    if (!selectedNames.has(primarySelectedName)) {
+        primarySelectedName = Array.from(selectedNames)[0] || '';
+    }
+    renderScreensList(extractedScreens);
+    updateInspector();
+});
+
 function openDrawer() {
     sideDrawer.classList.remove('translate-x-full');
 }
@@ -639,9 +654,14 @@ function renderScreensList(screens) {
                         ${formatNumber(s.ancho)}×${formatNumber(s.alto)} · X ${formatNumber(loc.x)} Y ${formatNumber(loc.y)} Z ${formatNumber(loc.z)}
                     </div>
                 </div>
-                <button data-focus="${escapeHtmlAttr(s.name)}" class="focus-screen-btn px-2 py-1 rounded-lg border border-vj-border bg-vj-panel hover:bg-vj-panel2 transition-colors text-xs text-white" title="Enfocar">
-                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h3"/><path d="M20 7V4h-3"/><path d="M4 17v3h3"/><path d="M20 17v3h-3"/><path d="M9 12h6"/><path d="M12 9v6"/></svg>
-                </button>
+                <div class="flex gap-1">
+                    <button data-focus="${escapeHtmlAttr(s.name)}" class="focus-screen-btn px-2 py-1 rounded-lg border border-vj-border bg-vj-panel hover:bg-vj-panel2 transition-colors text-xs text-white" title="Enfocar">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h3"/><path d="M20 7V4h-3"/><path d="M4 17v3h3"/><path d="M20 17v3h-3"/><path d="M9 12h6"/><path d="M12 9v6"/></svg>
+                    </button>
+                    <button data-delete="${escapeHtmlAttr(s.name)}" class="delete-screen-btn px-2 py-1 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/30 transition-colors text-xs text-red-400" title="Borrar">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                    </button>
+                </div>
             </div>
             <div class="hidden">
                 <span id="posx-${cssSafeId(s.name)}">${formatNumber(loc.x)}</span>
@@ -682,6 +702,19 @@ function renderScreensList(screens) {
             window.__VJ_THREE__?.focus(name);
             renderScreensList(extractedScreens);
             updateInspector();
+        });
+    });
+    dataList.querySelectorAll('.delete-screen-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            const name = btn.getAttribute('data-delete') || '';
+            if (!name) return;
+            if (confirm(`¿Borrar pantalla "${name}"?`)) {
+                window.__VJ_THREE__?.removeScreens([name]);
+            }
         });
     });
 }

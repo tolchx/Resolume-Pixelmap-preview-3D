@@ -173,6 +173,11 @@ window.addEventListener('keydown', (e) => {
     if (e.key === 'Shift') {
         transform.setRotationSnap(THREE.MathUtils.degToRad(45));
     }
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (!((e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) || e.isComposing)) {
+            removeSelectedScreens();
+        }
+    }
     if (!navState.enabled) return;
     if ((e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) || e.isComposing) return;
     if (k === 'w') navKeys.w = true;
@@ -825,6 +830,53 @@ function focus(name) {
     requestAnimationFrame(step);
 }
 
+function removeScreens(names) {
+    if (!names || !names.length) return;
+    const before = snapshotAll();
+    let changedSelection = false;
+    for (const name of names) {
+        if (selectedSet.has(name)) {
+            selectedSet.delete(name);
+            changedSelection = true;
+        }
+        if (primarySelected === name) primarySelected = '';
+        const mesh = meshesByName.get(name);
+        if (mesh) {
+            group.remove(mesh);
+            if (mesh.geometry) mesh.geometry.dispose();
+            if (mesh.material) mesh.material.dispose();
+            meshesByName.delete(name);
+        }
+        const outline = outlinesByName.get(name);
+        if (outline) {
+            scene.remove(outline);
+            if (outline.geometry) outline.geometry.dispose();
+            outlinesByName.delete(name);
+        }
+        materialsByName.delete(name);
+        userModifiedByName.delete(name);
+    }
+    if (changedSelection) {
+        if (!selectedSet.size) {
+            transform.detach();
+            selected = null;
+        } else {
+            if (!primarySelected) primarySelected = Array.from(selectedSet)[0];
+            attachForSelection();
+        }
+        updateSelectionMaterials();
+        emitSelection({ replace: true });
+    }
+    pushUndo(before);
+    saveState();
+    window.dispatchEvent(new CustomEvent('screens-removed', { detail: { names } }));
+}
+
+function removeSelectedScreens() {
+    if (!selectedSet.size) return;
+    removeScreens(Array.from(selectedSet));
+}
+
 function clearScreens() {
     transform.detach();
     selected = null;
@@ -1381,7 +1433,9 @@ window.__VJ_THREE__ = {
     canUndo,
     canRedo,
     setViewRotationDeg,
-    resetViewRotation
+    resetViewRotation,
+    removeScreens,
+    removeSelectedScreens
 };
 
 setGridVisible(true);
