@@ -844,7 +844,8 @@ downloadBtn.addEventListener('click', (e) => {
         const locZ = toCsvNumber(loc.z);
         const rot = state.rot3D || { x: 0, y: 0, z: 0 };
         const rotP = toCsvNumber(rot.x);
-        const rotY = toCsvNumber(rot.y);
+        // Negar Yaw: Three.js (mano derecha) → Unreal (mano izquierda) invierte el sentido de giro en Y
+        const rotY = toCsvNumber(-rot.y);
         const rotR = toCsvNumber(rot.z);
         
         const ndiBounds = ndiCache.get(s.screen);
