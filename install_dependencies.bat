@@ -1,5 +1,6 @@
 @echo off
 title Instalador de Dependencias - Resolume Pixelmap 3D
+cd /d "%~dp0"
 echo ===================================================================
 echo Verificando entorno para instalacion...
 echo ===================================================================

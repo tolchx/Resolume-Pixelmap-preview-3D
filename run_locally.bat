@@ -1,5 +1,6 @@
 @echo off
 title Resolume to Unreal CSV Exporter
+cd /d "%~dp0"
 echo Iniciando entorno...
 
 :: Comprobar si Node.js esta instalado
