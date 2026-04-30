@@ -25,14 +25,13 @@ const dir = new THREE.DirectionalLight(0xffffff, 0.6);
 dir.position.set(300, 500, 200);
 scene.add(dir);
 
+// Grid en el plano XZ (piso real, igual que en Unreal)
 const grid = new THREE.GridHelper(2000, 40, 0x22d3ee, 0x1f2937);
-grid.rotation.x = Math.PI / 2;
-grid.position.z = 0;
+grid.position.y = 0;
 scene.add(grid);
 
 const axes = new THREE.AxesHelper(200);
 scene.add(axes);
-axes.rotation.x = Math.PI / 2;
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -952,16 +951,20 @@ function getRectForMode(s) {
 function computeLayoutBounds(screens) {
     let minX = Infinity;
     let minY = Infinity;
+    let maxY = -Infinity;
     for (const s of screens) {
         const r = getRectForMode(s);
         const x = Number(r.x);
         const y = Number(r.y);
+        const rh = Number(r.h) || 0;
         if (Number.isFinite(x) && x < minX) minX = x;
         if (Number.isFinite(y) && y < minY) minY = y;
+        if (Number.isFinite(y + rh) && (y + rh) > maxY) maxY = y + rh;
     }
     if (!Number.isFinite(minX)) minX = 0;
     if (!Number.isFinite(minY)) minY = 0;
-    return { minX, minY };
+    if (!Number.isFinite(maxY)) maxY = 0;
+    return { minX, minY, maxY };
 }
 
 function applyLayoutToMesh(mesh, screen, bounds, forcePosition) {
@@ -977,11 +980,13 @@ function applyLayoutToMesh(mesh, screen, bounds, forcePosition) {
     if (outline) refreshOutlineGeometry(mesh, outline);
 
     if (forcePosition) {
+        // Pantallas paradas: X = horizontal, Y = altura, Z = 0
         const x = (Number(r.x) - bounds.minX) * sizeScale + w / 2;
-        // Invertimos el cálculo de Y: Resolume Y crece hacia abajo, Three.js Y crece hacia arriba.
-        // Esto coloca el tope de las pantallas (Y=0 en Resolume) en Y=0 en Three.js y bajan hacia -Y.
-        const y = - (Number(r.y) - bounds.minY) * sizeScale - h / 2;
-        mesh.position.set(x, y, 0);
+        // Resolume Y crece hacia abajo; en Three.js Y crece hacia arriba.
+        // Invertimos: pantalla con Y=0 en Resolume va arriba, Y=maxY va abajo (al piso).
+        const totalHeight = (bounds.maxY - bounds.minY) * sizeScale;
+        const y = totalHeight - (Number(r.y) - bounds.minY) * sizeScale - h / 2;
+        mesh.position.set(x, Math.max(h / 2, y), 0);
     }
 }
 
