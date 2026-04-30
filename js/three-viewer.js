@@ -211,13 +211,17 @@ transform.addEventListener('mouseDown', () => {
 });
 transform.addEventListener('mouseUp', () => {
     if (!activePreSnapshot) return;
-    if (hasOverlap() || outOfBounds()) {
-        applySnapshot(activePreSnapshot);
-        if (typeof window.onInvalidTransform === 'function') window.onInvalidTransform('Transformación inválida (solapamiento o fuera de límites). Revertida.');
-    } else {
-        pushUndo(activePreSnapshot);
-        saveState();
+    
+    let warning = '';
+    if (hasOverlap()) warning = 'Aviso: Hay solapamiento entre pantallas.';
+    if (outOfBounds()) warning = 'Aviso: Algunas pantallas están fuera de los límites recomendados.';
+    
+    if (warning && typeof window.onInvalidTransform === 'function') {
+        window.onInvalidTransform(warning);
     }
+    
+    pushUndo(activePreSnapshot);
+    saveState();
     activePreSnapshot = null;
 });
 scene.add(transform);
