@@ -19,7 +19,7 @@ if %errorlevel% neq 0 (
 if not exist "node_modules\" (
     echo.
     echo ===================================================================
-    echo Primera ejecucion detectada. Instalando dependencias (npm install)...
+    echo Primera ejecucion detectada. Instalando dependencias...
     echo Esto puede tardar un par de minutos, por favor espera.
     echo ===================================================================
     echo.

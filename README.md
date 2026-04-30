@@ -6,14 +6,15 @@ Ahora incluye **Soporte Spout In**, permitiendo visualizar en tiempo real el con
 
 ## Características Principales
 
-- **[NUEVO] Integración Spout In**: Servidor Node.js integrado que recibe la señal de video de Resolume vía Spout y la transmite en tiempo real a los slides/pantallas del entorno 3D mediante WebSockets. Cuenta con mapeo UV dinámico, auto-reconexión y métricas de FPS/Resolución en pantalla.
+- **[NUEVO] Integración Spout In**: Servidor Node.js integrado que recibe la señal de video de Resolume vía Spout y la transmite en tiempo real a los screens del entorno 3D mediante WebSockets.
+- **[NUEVO] Transformación Grupal**: Selecciona múltiples pantallas con `Ctrl + Clic` y edita sus posiciones o rotaciones de forma conjunta desde el panel lateral.
 - **Importación Flexible**: Soporte de drag & drop para archivos XML y JSON de Resolume.
 - **Visor 3D Interactivo**: Visualización de "Input" (origen de composición) y "Output" (posición final de las pantallas).
 - **Herramientas de Edición 3D**:
   - Manipulador (Gizmo) de Traslación y Rotación.
   - Ajuste manual de coordenadas (X, Y, Z) a través del panel lateral.
   - Snap to grid (10cm).
-  - Undo / Redo para transformaciones.
+  - Undo / Redo para transformaciones (Ctrl+Z / Ctrl+Y).
   - Guardado automático local en el navegador.
 - **Exportación Unreal Engine**: Genera un archivo CSV con las posiciones (en Unreal Units / centímetros), rotaciones y resoluciones, listo para ser consumido por Data Tables o Blueprints en UE.
 
@@ -21,56 +22,52 @@ Ahora incluye **Soporte Spout In**, permitiendo visualizar en tiempo real el con
 
 Para la funcionalidad base de importación y visor 3D, basta con cualquier navegador moderno.
 Para usar la **integración Spout en tiempo real**, necesitas:
-- **Windows 10/11** (Spout es una tecnología exclusiva de DirectX/OpenGL en Windows).
+- **Windows 10/11** (Spout es exclusivo de Windows).
 - **Node.js** (v16 o superior).
 - **Resolume Arena/Avenue** (u otro software que envíe señal por Spout).
 
 ## Instalación y Ejecución
 
-1. Clona o descarga este repositorio.
-2. Abre una terminal en la carpeta del proyecto e instala las dependencias de Node.js:
-   ```bash
-   npm install
-   ```
-3. Ejecuta el archivo por lotes incluido:
-   ```cmd
-   run_locally.bat
-   ```
-   *(Alternativamente, puedes ejecutar `node spout_server.js` de forma manual).*
-4. Abre tu navegador en `http://localhost:8080/`.
+Para facilitar la configuración, se han incluido scripts automatizados:
+
+1. **Instalación Inicial**:
+   - Descarga o clona el proyecto.
+   - **Extrae todos los archivos** del ZIP/RAR (no lo ejecutes desde dentro del compresor).
+   - Ejecuta `install_dependencies.bat`. Este script verificará si tienes Node.js e instalará todo lo necesario.
+
+2. **Ejecución**:
+   - Una vez instaladas las dependencias, ejecuta `run_locally.bat`.
+   - El script abrirá automáticamente tu navegador en `http://localhost:8080/` e iniciará el servidor Spout.
+
+## Resolución de Problemas (FAQ)
+
+**¿El archivo .bat se cierra solo al abrirlo?**
+- Asegúrate de haber **extraído** la carpeta del ZIP. Los archivos .bat no pueden instalar dependencias si están dentro de un archivo comprimido.
+- Verifica que tienes **Node.js** instalado. El instalador te dará el link si no lo encuentra.
+
+**¿No veo la señal de Spout en el navegador?**
+- Asegúrate de que el servidor está corriendo (la ventana negra de `run_locally.bat` debe estar abierta).
+- En Resolume, comprueba que la salida (Output) está enviando señal a "Spout".
 
 ## Cómo usar Spout con Resolume
 
 1. Abre **Resolume**.
 2. Ve a `Output > Advanced` (Salida Avanzada).
-3. Crea un nuevo *Screen* (Pantalla) y asigna su salida (`Device`) a **Spout**.
-4. Asegúrate de tener el servidor local Node corriendo (`run_locally.bat`).
-5. En la aplicación web, verás que el indicador en la esquina superior izquierda cambiará de "Buscando..." a **"Spout: Conectado"**.
-6. Arrastra tu archivo XML/JSON exportado de Resolume a la web. Los planos 3D se alinearán y empezarán a mostrar el video en tiempo real de forma sincronizada con tus recortes (Slices).
-
-> **Nota:** Para detalles técnicos sobre pruebas, rendimiento y resolución de problemas de Spout, consulta el archivo [TESTING_SPOUT.md](./TESTING_SPOUT.md).
+3. Crea un nuevo *Screen* y asigna su salida (`Device`) a **Spout**.
+4. En la aplicación web, el indicador superior cambiará a **"Spout: Conectado"**.
+5. Arrastra tu archivo XML/JSON. Los planos 3D mostrarán el video en tiempo real sincronizado con tus Slices.
 
 ## Uso General (Edición 3D)
 
-- **Cámara**: Clic izquierdo + Arrastrar para rotar. Rueda del ratón para hacer Zoom. Clic derecho + Arrastrar para paneo.
-- **Seleccionar pantallas**: Haz clic sobre una pantalla. Usa `Ctrl + Clic` para selección múltiple.
-- **Modo Input/Output**: Alterna entre ver la posición original de las pantallas en la composición 2D (Input) y su posición en el mundo 3D (Output).
-- **Transformar**: Usa los botones superiores para cambiar entre mover y rotar, o edita los valores directamente en el panel lateral derecho.
-- **Exportar**: Usa el botón verde de "Descargar CSV (Unreal)" en el panel lateral para obtener el archivo de mapeo final.
+- **Cámara**: Clic izquierdo para rotar. Rueda para Zoom. Clic derecho para paneo.
+- **Selección múltiple**: Usa `Ctrl + Clic` sobre las pantallas o en la lista lateral.
+- **Navegación FPS**: Pulsa la tecla `N` para entrar en modo vuelo (WASD + Mouse).
+- **Panel Lateral**: Pulsa la tecla `P` para abrir/cerrar el panel de control rápidamente.
 
 ## Tecnologías Utilizadas
 
 - **Three.js** (Renderizado 3D)
-- **Tailwind CSS** (Estilos y UI)
-- **Vanilla JavaScript** (Lógica Frontend)
-- **Node.js + Express + WS** (Servidor Backend y WebSockets)
-- **Sharp** (Compresión de video ultra-rápida)
-- **@napolab/texture-bridge** (Librería de captura Spout nativa para Node.js)
-
-## Estructura
-
-- `index.html`: markup y referencias a CSS/JS.
-- `css/app.css`: estilos y helpers de tema.
-- `js/tailwind-config.js`: configuración de Tailwind (CDN).
-- `js/app.js`: UI, import/parsing, lista/inspector, export CSV, vista XML.
-- `js/three-viewer.js`: visor 3D (Three.js), selección, gizmo, navegación, historial.
+- **Tailwind CSS** (UI moderna y responsive)
+- **Node.js + Express + WS** (Servidor Backend)
+- **Sharp** (Procesamiento de imagen de alta velocidad)
+- **@napolab/texture-bridge** (Captura Spout nativa)

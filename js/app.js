@@ -140,6 +140,11 @@ window.addEventListener('keydown', (e) => {
         statusText.textContent = isDrawerOpen() ? 'Panel abierto' : 'Panel cerrado';
         setTimeout(() => { statusText.textContent = 'Listo'; }, 800);
     }
+    if (e.key === 'n' || e.key === 'N') {
+        e.preventDefault();
+        const enabled = !navBtn.classList.contains('bg-vj-panel');
+        setNavUiEnabled(!enabled);
+    }
 });
 
 function setViewMode(mode) {
