@@ -169,9 +169,12 @@ document.addEventListener('pointerlockchange', onPointerLockChange);
 document.addEventListener('mousemove', onNavMouseMove);
 window.addEventListener('keydown', (e) => {
     if (!e) return;
+    const k = String(e.key || '').toLowerCase();
+    if (e.key === 'Shift') {
+        transform.setRotationSnap(THREE.MathUtils.degToRad(45));
+    }
     if (!navState.enabled) return;
     if ((e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) || e.isComposing) return;
-    const k = String(e.key || '').toLowerCase();
     if (k === 'w') navKeys.w = true;
     if (k === 'a') navKeys.a = true;
     if (k === 's') navKeys.s = true;
@@ -182,6 +185,9 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => {
     if (!e) return;
     const k = String(e.key || '').toLowerCase();
+    if (e.key === 'Shift') {
+        transform.setRotationSnap(null);
+    }
     if (k === 'w') navKeys.w = false;
     if (k === 'a') navKeys.a = false;
     if (k === 's') navKeys.s = false;
