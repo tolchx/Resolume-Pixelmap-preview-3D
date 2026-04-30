@@ -21,8 +21,8 @@ echo [OK] Node.js detectado.
 :: 2. Comprobar package.json
 if not exist "package.json" (
     echo [ERROR] No se encuentra el archivo 'package.json'.
-    echo Asegurate de haber extraido todos los archivos del ZIP/RAR antes de ejecutar este script.
-    echo No ejecutes este archivo directamente desde el interior del compresor (WinRAR/7-Zip).
+    echo Asegurate de haber extraido todos los archivos del ZIP o RAR antes de ejecutar este script.
+    echo No ejecutes este archivo directamente desde el interior del compresor.
     pause
     exit /b
 )
@@ -30,10 +30,10 @@ if not exist "package.json" (
 echo [OK] package.json detectado.
 
 :: 3. Limpiar instalaciones previas si existen (opcional pero recomendado para evitar conflictos de versiones nativas)
-if exist "node_modules\" (
+if exist "node_modules" (
     echo Se ha detectado una carpeta 'node_modules' previa. 
     echo Para asegurar una instalacion limpia, se recomienda borrarla primero.
-    set /p DEL_NODE="¿Deseas borrar 'node_modules' y reinstalar todo? (S/N): "
+    set /p DEL_NODE="Deseas borrar 'node_modules' y reinstalar todo? S/N: "
     if /i "%DEL_NODE%"=="S" (
         echo Borrando carpeta node_modules...
         rd /s /q node_modules
@@ -44,7 +44,7 @@ if exist "node_modules\" (
 echo.
 echo ===================================================================
 echo Instalando dependencias de Node.js...
-echo Esto puede tardar unos minutos (especialmente 'sharp' y 'texture-bridge').
+echo Esto puede tardar unos minutos - especialmente sharp y texture-bridge.
 echo ===================================================================
 echo.
 
@@ -57,7 +57,7 @@ if %errorlevel% neq 0 (
     echo Posibles causas:
     echo 1. No hay conexion a internet.
     echo 2. El archivo se esta ejecutando desde una carpeta sin permisos de escritura.
-    echo 3. Faltan herramientas de compilacion (aunque no deberian ser necesarias).
+    echo 3. Faltan herramientas de compilacion - aunque no deberian ser necesarias.
     echo ===================================================================
 ) else (
     echo.
